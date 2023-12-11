@@ -52,16 +52,16 @@ If all works, put the case back together and enjoy you ESPHome enabled nebula li
 
 
 ## ESP12 pin configuration
-| GPIO          | Function
-| ------------- |-------------
-| GPIO0         | LED outside case
-| GPIO4         | Red
-| GPIO5         | Laser
-| GPIO12        | Green
-| GPIO13        | Motor
-| GPIO14        | Blue
-| GPIO15        | LED outside case
-| GPIO16        | Button
+|Original PIN  | GPIO          | Function
+| ------------ | ------------- |-------------
+| P1           | GPIO0         | LED outside case (blue)
+| P9           | GPIO4         | Red
+| P8           | GPIO5         | Laser
+| P24          | GPIO12        | Green
+| P6           | GPIO13        | Motor
+| P26          | GPIO14        | Blue
+| P7           | GPIO15        | LED outside case (red)
+| P14          | GPIO16        | Button
 
 ## Tools used
 - [Nebula light, white](https://www.aliexpress.com/item/1005001427043343.html?spm=a2g0s.9042311.0.0.27424c4dFY0lak)
@@ -74,6 +74,7 @@ If all works, put the case back together and enjoy you ESPHome enabled nebula li
 ## ESPHome config
 For some reason, and I don't know why, if the motor is stopped the brightness of the laser is effected. By powering the motor at very low power (15 percent) the brightness of the laser is consistant and will not rotate the laser or RBG led. 
 
+### ESP12
 ```YAML
 substitutions:
   name: <INSERT PREFFERED NAME>
@@ -239,6 +240,178 @@ interval:
           - light.turn_off: 
               id: rled
 ```
+
+BK7231T:
+```YAML
+substitutions:
+  name: <INSERT PREFFERED NAME>
+  
+esphome:
+  name: ${name}
+
+bk72xx:
+  board: wb3s
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  domain: !secret domain_iot
+  power_save_mode: none
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${name}HotSpot"
+    password: !secret wifi_fallback_password
+    
+captive_portal:
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  password: !secret api_password
+
+ota:
+  password: !secret ota_password
+
+# Enable Web server.
+web_server:
+  port: 80
+
+light:
+  - platform: rgb
+    name: ${name}_light
+    id: rgb_light
+    red: red
+    green: green
+    blue: blue
+    restore_mode: ALWAYS_OFF
+    effects:
+      - flicker:
+          name: Flicker
+          alpha: 95%
+          intensity: 2.5%
+      - random:
+          name: Random
+          transition_length: 2.5s
+          update_interval: 3s
+      - random:
+          name: Random Slow
+          transition_length: 10s
+          update_interval: 5s
+
+  - platform: monochromatic
+    name: ${name}_laser
+    id: laser
+    output: laser_pwm
+    restore_mode: ALWAYS_OFF
+  - platform: monochromatic
+    name: ${name}_bled
+    id: bled
+    output: bled_pwm
+    restore_mode: ALWAYS_OFF
+    internal: true
+  - platform: monochromatic
+    name: ${name}_rled
+    id: rled
+    output: rled_pwm
+    restore_mode: ALWAYS_OFF
+    internal: true
+
+fan:
+  platform: speed
+  name: "${name}_Motor"
+  id: motor
+  output: motor_pwm
+  restore_mode: ALWAYS_OFF
+
+output:
+  - platform: libretiny_pwm
+    id: red
+    pin: P9
+    inverted: true
+  - platform: libretiny_pwm
+    id: green
+    pin: GPIO12
+    inverted: true
+  - platform: libretiny_pwm
+    id: blue
+    pin: GPIO14
+    inverted: true
+
+  - platform: libretiny_pwm
+    id: laser_pwm
+    pin: GPIO5
+    # max_power: 80%
+    # frequency: 2000 Hz
+    inverted: true
+  - platform: libretiny_pwm
+    id: motor_pwm
+    pin: GPIO13
+    min_power: 15%
+
+  - platform: libretiny_pwm
+    id: bled_pwm
+    pin: P1
+    inverted: true
+  - platform: libretiny_pwm
+    id: rled_pwm
+    pin: GPIO15
+    inverted: true
+
+binary_sensor:
+  - platform: gpio
+    pin: 
+      number: GPIO16
+      mode: INPUT_PULLDOWN_16
+      inverted: true
+    name: ${name}_button
+    on_press:
+      then:
+        - light.turn_on: 
+            id: rgb_light
+            brightness: 30%
+        - light.turn_on: 
+            id: laser
+            brightness: 65%
+        - delay : 1h
+        - light.turn_off: 
+            id: rgb_light
+        - light.turn_off: 
+            id: laser
+    
+interval:
+  - interval: 1s
+    then:
+      if:
+        condition:
+          wifi.connected:
+        then:
+          - light.turn_on: 
+              id: bled
+              brightness: 50%
+        else:
+          - light.turn_off: 
+              id: bled
+  - interval: 1s
+    then:
+      if:
+        condition:
+          api.connected:
+        then:
+          - light.turn_on: 
+              id: rled
+              brightness: 50%
+        else:
+          - light.turn_off: 
+              id: rled
+```
+
+
+
+---
 🎁 Found this useful or want to say 'thanks' and support my efforts...
 
 [![BMC](https://www.buymeacoffee.com/assets/img/custom_images/white_img.png)](https://www.buymeacoffee.com/kireque) **And leave a me a message to let me know.**  ❤
